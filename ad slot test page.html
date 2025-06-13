@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GPT Test Page</title>
+  <script async src="https://securepubads.g.doubleclick.net/tag/js/gpt.js"></script>
+  <style>
+    .ad-slot {
+      border: 1px solid #ccc;
+      margin: 10px 0;
+      padding: 10px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>Ad Slot Test Page</h1>
+
+  <!-- Ad Slots -->
+  <div id="div-gpt-ad-1" class="ad-slot" style="width: 300px; height: 250px;">Ad Slot 1</div>
+  <div id="div-gpt-ad-2" class="ad-slot" style="width: 728px; height: 90px;">Ad Slot 2</div>
+  <div id="div-gpt-ad-3" class="ad-slot" style="width: 160px; height: 600px;" data-loading="lazy">Ad Slot 3 (Lazy)</div>
+
+  <script>
+    const webhookUrl = 'https://hooks.zapier.com/hooks/catch/23313843/uy9ly88/'; // Replace with your actual Zapier webhook
+
+    window.googletag = window.googletag || { cmd: [] };
+    googletag.cmd.push(function () {
+      const slot1 = googletag.defineSlot('/12345678/test1', [300, 250], 'div-gpt-ad-1').addService(googletag.pubads());
+      const slot2 = googletag.defineSlot('/12345678/test2', [728, 90], 'div-gpt-ad-2').addService(googletag.pubads());
+      const slot3 = googletag.defineSlot('/WRONGNETWORK/test3', [160, 600], 'div-gpt-ad-3').addService(googletag.pubads());
+
+      googletag.enableServices();
+      googletag.display('div-gpt-ad-1');
+      googletag.display('div-gpt-ad-2');
+      googletag.display('div-gpt-ad-3');
+
+      // Wait a moment to collect data after GPT loads
+      setTimeout(() => {
+        const domSlots = Array.from(document.querySelectorAll('.ad-slot')).map(slot => {
+          return {
+            id: slot.id,
+            width: slot.offsetWidth,
+            height: slot.offsetHeight,
+            lazy: slot.getAttribute('data-loading') === 'lazy'
+          };
+        });
+
+        const gptSlots = googletag.pubads().getSlots().map(slot => {
+          return {
+            slotId: slot.getSlotElementId(),
+            adUnitPath: slot.getAdUnitPath(),
+            sizes: slot.getSizes().map(s => s.toString())
+          };
+        });
+
+        const wrongNetwork = gptSlots.filter(s => !s.adUnitPath.startsWith('/12345678/')).map(s => s.slotId);
+
+        // Get IP & country from public API
+        fetch('https://ipapi.co/json/')
+          .then(res => res.json())
+          .then(ipData => {
+            const payload = {
+              siteUrl: window.location.href,
+              timestamp: new Date().toISOString(),
+              gptLoaded: typeof googletag !== 'undefined',
+              adSlotsInDOM: domSlots,
+              gptSlotsRegistered: gptSlots,
+              slotsWithWrongNetworkID: wrongNetwork,
+              browser: navigator.userAgent,
+              language: navigator.language,
+              screenResolution: `${window.innerWidth}x${window.innerHeight}`,
+              ip: ipData.ip,
+              country: ipData.country_name
+            };
+
+            fetch(webhookUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            })
+            .then(() => console.log('✅ Data sent to Zapier'))
+            .catch(err => console.error('❌ Webhook error:', err));
+          });
+      }, 2000);
+    });
+  </script>
+</body>
+</html>
