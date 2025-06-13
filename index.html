@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>GPT Test Page</title>
+  <title>GPT Ad Slot Test</title>
   <script async src="https://securepubads.g.doubleclick.net/tag/js/gpt.js"></script>
   <style>
     .ad-slot {
@@ -23,7 +23,18 @@
   <div id="div-gpt-ad-3" class="ad-slot" style="width: 160px; height: 600px;" data-loading="lazy">Ad Slot 3 (Lazy)</div>
 
   <script>
-    const webhookUrl = 'https://hooks.zapier.com/hooks/catch/23313843/uy9ly88/'; // Replace with your actual Zapier webhook
+    const webhookUrl = 'https://hooks.zapier.com/hooks/catch/23313843/uy9ly88/'; // Zapier webhook
+    const ipInfoToken = ''; // optional token if you hit rate limits
+
+    // Set up IntersectionObserver for visible ad slots
+    const visibleSlots = new Set();
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) visibleSlots.add(entry.target.id);
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.ad-slot').forEach(el => observer.observe(el));
 
     window.googletag = window.googletag || { cmd: [] };
     googletag.cmd.push(function () {
@@ -36,14 +47,15 @@
       googletag.display('div-gpt-ad-2');
       googletag.display('div-gpt-ad-3');
 
-      // Wait a moment to collect data after GPT loads
+      // Wait for GPT to load + observer to catch visibility
       setTimeout(() => {
         const domSlots = Array.from(document.querySelectorAll('.ad-slot')).map(slot => {
           return {
             id: slot.id,
             width: slot.offsetWidth,
             height: slot.offsetHeight,
-            lazy: slot.getAttribute('data-loading') === 'lazy'
+            lazyDeclared: slot.getAttribute('data-loading') === 'lazy',
+            isVisible: visibleSlots.has(slot.id)
           };
         });
 
@@ -57,34 +69,11 @@
 
         const wrongNetwork = gptSlots.filter(s => !s.adUnitPath.startsWith('/12345678/')).map(s => s.slotId);
 
-        // Get IP & country from public API
-        fetch('https://ipapi.co/json/')
+        // Get IP and country
+        fetch(`https://ipinfo.io/json?token=${ipInfoToken}`)
           .then(res => res.json())
           .then(ipData => {
             const payload = {
               siteUrl: window.location.href,
               timestamp: new Date().toISOString(),
-              gptLoaded: typeof googletag !== 'undefined',
-              adSlotsInDOM: domSlots,
-              gptSlotsRegistered: gptSlots,
-              slotsWithWrongNetworkID: wrongNetwork,
-              browser: navigator.userAgent,
-              language: navigator.language,
-              screenResolution: `${window.innerWidth}x${window.innerHeight}`,
-              ip: ipData.ip,
-              country: ipData.country_name
-            };
-
-            fetch(webhookUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
-            })
-            .then(() => console.log('✅ Data sent to Zapier'))
-            .catch(err => console.error('❌ Webhook error:', err));
-          });
-      }, 2000);
-    });
-  </script>
-</body>
-</html>
+              gptLoaded: typeof googletag !== 'undefine
